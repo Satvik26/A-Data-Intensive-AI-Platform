@@ -25,6 +25,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        env_nested_delimiter="__",
     )
 
     # Application
@@ -68,12 +69,12 @@ class Settings(BaseSettings):
         description="PostgreSQL connection URL",
     )
     database_pool_size: int = Field(
-        default=20,
+        default=100,
         ge=1,
         description="Database connection pool size",
     )
     database_max_overflow: int = Field(
-        default=10,
+        default=50,
         ge=0,
         description="Max overflow connections",
     )
@@ -296,6 +297,18 @@ class Settings(BaseSettings):
         ge=1,
         description="Maximum page size",
     )
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def validate_cors_origins(cls, v):
+        """Parse CORS origins from comma-separated string or list."""
+        if v is None:
+            return ["http://localhost:3000", "http://localhost:8000"]
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        if isinstance(v, list):
+            return v
+        return ["http://localhost:3000", "http://localhost:8000"]
 
     @field_validator("database_url", mode="before")
     @classmethod

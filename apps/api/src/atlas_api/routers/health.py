@@ -5,11 +5,15 @@ Provides health, readiness, and liveness probes for monitoring
 and orchestration. Implements DDIA-aligned health check patterns.
 """
 
+import asyncio
+import logging
 import time
 from datetime import datetime
 
 from fastapi import APIRouter, status
 
+from atlas_api.adapters.database import get_database_adapter
+from atlas_api.adapters.redis import get_redis_adapter
 from atlas_api.config import get_settings
 from atlas_api.schemas.health import (
     DependencyHealth,
@@ -21,6 +25,7 @@ from atlas_api.schemas.health import (
 
 router = APIRouter()
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 # Track application start time for uptime calculation
 _start_time = time.time()
@@ -33,17 +38,28 @@ async def check_postgres_health() -> DependencyHealth:
     Returns:
         DependencyHealth: PostgreSQL health status
     """
-    # TODO: Implement actual database health check
-    # For now, return mock healthy status
-    return DependencyHealth(
-        name="postgresql",
-        status=HealthStatus.HEALTHY,
-        latency_ms=2.5,
-        metadata={
-            "version": "15.0",
-            "connections": 5,
-        },
-    )
+    try:
+        db_adapter = get_database_adapter()
+        health_data = await db_adapter.health_check()
+
+        return DependencyHealth(
+            name="postgresql",
+            status=HealthStatus.HEALTHY if health_data["healthy"] else HealthStatus.UNHEALTHY,
+            latency_ms=health_data["latency_ms"],
+            metadata={
+                "pool_size": health_data["pool"]["size"],
+                "checked_out": health_data["pool"]["checked_out"],
+                "overflow": health_data["pool"]["overflow"],
+            },
+        )
+    except Exception as e:
+        logger.error(f"PostgreSQL health check failed: {e}", exc_info=True)
+        return DependencyHealth(
+            name="postgresql",
+            status=HealthStatus.UNHEALTHY,
+            latency_ms=None,
+            error=str(e),
+        )
 
 
 async def check_redis_health() -> DependencyHealth:
@@ -53,17 +69,27 @@ async def check_redis_health() -> DependencyHealth:
     Returns:
         DependencyHealth: Redis health status
     """
-    # TODO: Implement actual Redis health check
-    # For now, return mock healthy status
-    return DependencyHealth(
-        name="redis",
-        status=HealthStatus.HEALTHY,
-        latency_ms=1.2,
-        metadata={
-            "version": "7.0",
-            "memory_mb": 128,
-        },
-    )
+    try:
+        redis_adapter = get_redis_adapter()
+        health_data = await redis_adapter.health_check()
+
+        return DependencyHealth(
+            name="redis",
+            status=HealthStatus.HEALTHY if health_data["healthy"] else HealthStatus.UNHEALTHY,
+            latency_ms=health_data["latency_ms"],
+            metadata={
+                "version": health_data["version"],
+                "uptime_seconds": health_data["uptime_seconds"],
+            },
+        )
+    except Exception as e:
+        logger.error(f"Redis health check failed: {e}", exc_info=True)
+        return DependencyHealth(
+            name="redis",
+            status=HealthStatus.UNHEALTHY,
+            latency_ms=None,
+            error=str(e),
+        )
 
 
 async def check_kafka_health() -> DependencyHealth:
@@ -136,13 +162,42 @@ def determine_overall_status(dependencies: list[DependencyHealth]) -> HealthStat
 
 @router.get(
     "/health",
+    status_code=status.HTTP_200_OK,
+    summary="Lightweight Health Check",
+    description=(
+        "Fast, lightweight health check that returns immediately without querying dependencies. "
+        "Use this endpoint for high-frequency health checks, load balancer probes, and load testing. "
+        "For detailed dependency health information, use /health/deep instead."
+    ),
+)
+async def health_check_lightweight() -> dict:
+    """
+    Lightweight health check endpoint.
+
+    Returns immediately without querying any dependencies.
+    Suitable for high-frequency health checks and load testing.
+
+    Returns:
+        dict: Simple health status
+    """
+    return {
+        "status": "healthy",
+        "version": settings.app_version,
+        "environment": settings.environment,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+@router.get(
+    "/health/deep",
     response_model=HealthResponse,
     status_code=status.HTTP_200_OK,
-    summary="Health Check",
+    summary="Deep Health Check",
     description=(
         "Comprehensive health check endpoint that verifies the status of "
         "the API and all its dependencies (database, cache, message queue, storage). "
-        "Returns detailed health information including latency and metadata."
+        "Returns detailed health information including latency and metadata. "
+        "WARNING: This endpoint performs actual database queries and should not be used for high-frequency health checks."
     ),
     responses={
         200: {
@@ -182,14 +237,14 @@ async def health_check() -> HealthResponse:
     Returns:
         HealthResponse: Detailed health status
     """
-    # Check all dependencies in parallel
-    # TODO: Use asyncio.gather for parallel execution
-    dependencies = [
-        await check_postgres_health(),
-        await check_redis_health(),
-        await check_kafka_health(),
-        await check_minio_health(),
-    ]
+    # Check all dependencies in parallel using asyncio.gather
+    dependencies = await asyncio.gather(
+        check_postgres_health(),
+        check_redis_health(),
+        check_kafka_health(),
+        check_minio_health(),
+        return_exceptions=False,  # Raise exceptions instead of returning them
+    )
 
     # Determine overall status
     overall_status = determine_overall_status(dependencies)

@@ -56,11 +56,15 @@ install: ## Install dependencies
 	@echo "$(BLUE)Installing dependencies...$(NC)"
 	poetry install
 
-run: ## Run API locally (outside Docker)
-	@echo "$(BLUE)Starting API server...$(NC)"
+run: ## Run API locally with optimized settings (8 workers)
+	@echo "$(BLUE)Starting API server with 8 workers...$(NC)"
+	poetry run uvicorn atlas_api.main:app --host 0.0.0.0 --port 8000 --workers 8
+
+run-dev: ## Run API in development mode (single worker, auto-reload)
+	@echo "$(BLUE)Starting API server in development mode...$(NC)"
 	poetry run uvicorn atlas_api.main:app --reload --host 0.0.0.0 --port 8000
 
-dev: up run ## Start services and run API
+dev: up run-dev ## Start services and run API in development mode
 
 # Code Quality Commands
 lint: ## Run linter (Ruff)

@@ -35,10 +35,20 @@ COPY pyproject.toml poetry.lock* ./
 # Install dependencies
 RUN poetry install --no-root --only main
 
+# Copy application code to builder for installation
+COPY src/ ./src/
+COPY pyproject.toml ./
+
+# Install the application package
+RUN poetry install --only main
+
 # Runtime stage
 FROM base as runtime
 
 WORKDIR /app
+
+# Set PYTHONPATH to include src directory
+ENV PYTHONPATH="/app/src:$PYTHONPATH"
 
 # Copy installed dependencies from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages

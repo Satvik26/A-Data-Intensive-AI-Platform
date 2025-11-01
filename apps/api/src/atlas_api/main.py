@@ -16,10 +16,19 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import make_asgi_app
 
+from atlas_api.adapters.database import get_database_adapter
+from atlas_api.adapters.redis import get_redis_adapter
 from atlas_api.config import get_settings
 from atlas_api.instrumentation.logging import setup_logging
 from atlas_api.instrumentation.metrics import setup_metrics
 from atlas_api.instrumentation.tracing import setup_tracing
+from atlas_api.middleware.reliability import (
+    ErrorHandlingMiddleware,
+    LoadSheddingMiddleware,
+    MetricsMiddleware,
+    RequestIDMiddleware,
+    TimeoutMiddleware,
+)
 from atlas_api.routers import health
 
 # Initialize settings and logging
@@ -61,8 +70,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         setup_tracing(settings)
         logger.info("OpenTelemetry tracing initialized")
 
-    # TODO: Initialize database connection pool
-    # TODO: Initialize Redis connection pool
+    # Initialize database connection pool
+    db_adapter = get_database_adapter(settings)
+    await db_adapter.connect()
+    logger.info("Database connection pool initialized")
+
+    # Initialize Redis connection pool
+    redis_adapter = get_redis_adapter(settings)
+    await redis_adapter.connect()
+    logger.info("Redis connection pool initialized")
+
     # TODO: Initialize Kafka producer/consumer
     # TODO: Initialize MinIO client
     # TODO: Run database migrations check
@@ -75,8 +92,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown
     logger.info("Shutting down Atlas API gracefully")
 
-    # TODO: Close database connections
-    # TODO: Close Redis connections
+    # Close database connections
+    await db_adapter.disconnect()
+    logger.info("Database connections closed")
+
+    # Close Redis connections
+    await redis_adapter.disconnect()
+    logger.info("Redis connections closed")
+
     # TODO: Flush Kafka producer
     # TODO: Close MinIO client
     # TODO: Flush metrics
@@ -116,8 +139,18 @@ app.add_middleware(
 # DDIA: Reduce network bandwidth usage
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# TODO: Add request ID middleware for distributed tracing
-# TODO: Add rate limiting middleware
+# Add reliability middleware (order matters - innermost first)
+# DDIA Chapter 1: These middleware implement reliability patterns
+# NOTE: LoadSheddingMiddleware disabled - has race condition bugs with shared counter
+# TODO: Rewrite using asyncio.Semaphore or Redis-based rate limiting
+# app.add_middleware(LoadSheddingMiddleware, max_concurrent_requests=1000)
+app.add_middleware(ErrorHandlingMiddleware)
+# NOTE: MetricsMiddleware disabled - BaseHTTPMiddleware has performance issues
+# TODO: Replace with Prometheus FastAPI Instrumentator or pure ASGI middleware
+# app.add_middleware(MetricsMiddleware)
+app.add_middleware(TimeoutMiddleware)
+app.add_middleware(RequestIDMiddleware)
+
 # TODO: Add authentication middleware
 # TODO: Add request logging middleware
 

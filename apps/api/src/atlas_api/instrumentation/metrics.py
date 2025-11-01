@@ -11,15 +11,16 @@ from prometheus_client import Counter, Gauge, Histogram, Info
 app_info = Info("atlas_api", "Application information")
 
 # HTTP metrics (RED method)
+# DDIA Chapter 1: RED metrics (Rate, Errors, Duration) are essential for monitoring
 http_requests_total = Counter(
     "atlas_api_http_requests_total",
-    "Total HTTP requests",
+    "Total HTTP requests (Rate)",
     ["method", "endpoint", "status"],
 )
 
 http_request_duration_seconds = Histogram(
     "atlas_api_http_request_duration_seconds",
-    "HTTP request duration in seconds",
+    "HTTP request duration in seconds (Duration)",
     ["method", "endpoint"],
     buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
 )
@@ -27,6 +28,25 @@ http_request_duration_seconds = Histogram(
 http_requests_in_progress = Gauge(
     "atlas_api_http_requests_in_progress",
     "HTTP requests currently in progress",
+    ["method", "endpoint"],
+)
+
+# Error metrics by route
+http_errors_total = Counter(
+    "atlas_api_http_errors_total",
+    "Total HTTP errors by route (Errors)",
+    ["method", "endpoint", "status_code"],
+)
+
+http_5xx_errors_total = Counter(
+    "atlas_api_http_5xx_errors_total",
+    "Total 5xx server errors",
+    ["method", "endpoint"],
+)
+
+http_4xx_errors_total = Counter(
+    "atlas_api_http_4xx_errors_total",
+    "Total 4xx client errors",
     ["method", "endpoint"],
 )
 

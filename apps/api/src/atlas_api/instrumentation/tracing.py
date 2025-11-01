@@ -6,9 +6,9 @@ Follows DDIA principles for debugging distributed systems.
 """
 
 import logging
+from typing import Optional
 
 from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
@@ -19,6 +19,14 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from atlas_api.config import Settings
 
 logger = logging.getLogger(__name__)
+
+# Optional OTLP exporter - only imported if available
+try:
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    OTLP_AVAILABLE = True
+except ImportError:
+    OTLP_AVAILABLE = False
+    OTLPSpanExporter = None  # type: ignore
 
 
 def setup_tracing(settings: Settings) -> None:
@@ -47,16 +55,19 @@ def setup_tracing(settings: Settings) -> None:
     # Create tracer provider
     tracer_provider = TracerProvider(resource=resource)
 
-    # Add OTLP exporter
-    try:
-        otlp_exporter = OTLPSpanExporter(
-            endpoint=settings.otel_exporter_otlp_endpoint,
-            insecure=True,  # Use insecure for development
-        )
-        tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
-        logger.info(f"OTLP exporter configured: {settings.otel_exporter_otlp_endpoint}")
-    except Exception as e:
-        logger.warning(f"Failed to configure OTLP exporter: {e}")
+    # Add OTLP exporter if available
+    if OTLP_AVAILABLE and OTLPSpanExporter is not None:
+        try:
+            otlp_exporter = OTLPSpanExporter(
+                endpoint=settings.otel_exporter_otlp_endpoint,
+                insecure=True,  # Use insecure for development
+            )
+            tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+            logger.info(f"OTLP exporter configured: {settings.otel_exporter_otlp_endpoint}")
+        except Exception as e:
+            logger.warning(f"Failed to configure OTLP exporter: {e}")
+    else:
+        logger.info("OTLP exporter not available - install opentelemetry-exporter-otlp")
 
     # Set global tracer provider
     trace.set_tracer_provider(tracer_provider)
