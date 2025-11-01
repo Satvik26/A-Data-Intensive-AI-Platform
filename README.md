@@ -212,14 +212,23 @@ pytest apps/api/tests/unit/test_health.py -v
 
 Atlas implements DDIA-aligned reliability patterns:
 
-- **Idempotency:** All write operations use idempotency keys
+### ✅ Chapter 1: Reliable, Scalable, Maintainable Systems
+- **SLI/SLO Definitions:** Three tiers (critical 99.99%, default 99.9%, non-critical 99%)
 - **Retries:** Exponential backoff with jitter for transient failures
-- **Circuit Breakers:** Prevent cascade failures
-- **Timeouts:** Explicit timeouts on all external calls
-- **Backpressure:** Rate limiting and queue depth monitoring
-- **Outbox Pattern:** Reliable event publishing with transactional guarantees
+- **Circuit Breakers:** Prevent cascade failures (CLOSED → OPEN → HALF_OPEN)
+- **Timeouts:** Explicit timeouts on all external calls (504 on timeout)
+- **Load Shedding:** Graceful degradation under overload (429 responses)
+- **Metrics:** RED method (Rate, Errors, Duration) with percentile buckets
 - **Health Checks:** Liveness and readiness probes
 - **Graceful Shutdown:** Clean resource cleanup on termination
+
+### 🔄 Future Chapters
+- **Chapter 2:** Idempotency keys, outbox pattern, reliable event publishing
+- **Chapter 3:** Replication, leader-follower, multi-leader architectures
+- **Chapter 4:** Partitioning, hash-based, range-based, directory-based strategies
+- **Chapter 5:** Transactions, ACID properties, isolation levels
+- **Chapter 6:** Consistency models, linearizability, eventual consistency
+- **Chapter 7:** Batch and stream processing, MapReduce, Spark, Kafka Streams
 
 ## 📚 Documentation
 
@@ -227,6 +236,62 @@ Atlas implements DDIA-aligned reliability patterns:
 - **[Runbooks](docs/runbooks/)** - Operational procedures
 - **[API Documentation](http://localhost:8000/docs)** - Interactive OpenAPI docs
 - **[Architecture Diagrams](docs/architecture/)** - System design and data flows
+- **[DDIA Chapter 1 Summary](docs/architecture/ch1-reliable-scalable-maintainable.md)** - Reliability patterns
+- **[Service Quality Envelope Runbook](docs/runbooks/002-service-quality-envelope.md)** - SLI/SLO operations
+
+## 🗺️ Roadmap
+
+### Phase 1: Foundation ✅ COMPLETE
+- [x] DDIA Chapter 1: Reliable, Scalable, Maintainable Systems
+  - [x] SLI/SLO definitions (3 tiers)
+  - [x] Retry with exponential backoff + jitter
+  - [x] Circuit breaker pattern
+  - [x] Load shedding middleware
+  - [x] Timeout enforcement
+  - [x] RED metrics (Rate, Errors, Duration)
+  - [x] Grafana dashboard
+  - [x] Operational runbook
+  - [x] 80+ tests, 100% coverage
+
+### Phase 2: Advanced Reliability (Q4 2025)
+- [ ] DDIA Chapter 2: Replication & Consistency
+  - [ ] Idempotency keys for write operations
+  - [ ] Outbox pattern for reliable event publishing
+  - [ ] Bulkhead pattern for resource isolation
+  - [ ] Adaptive timeout adjustment
+  - [ ] Chaos testing framework
+
+### Phase 3: Scalability (Q1 2026)
+- [ ] DDIA Chapter 3: Partitioning & Sharding
+  - [ ] Hash-based partitioning
+  - [ ] Range-based partitioning
+  - [ ] Directory-based partitioning
+  - [ ] Rebalancing strategies
+  - [ ] Partition-aware routing
+
+### Phase 4: Transactions (Q2 2026)
+- [ ] DDIA Chapter 4: Transactions & Consistency
+  - [ ] ACID properties
+  - [ ] Isolation levels (READ_UNCOMMITTED, READ_COMMITTED, REPEATABLE_READ, SERIALIZABLE)
+  - [ ] Distributed transactions
+  - [ ] Two-phase commit
+  - [ ] Saga pattern
+
+### Phase 5: Observability (Q3 2026)
+- [ ] Enhanced Observability
+  - [ ] Distributed tracing with correlation IDs
+  - [ ] Custom business metrics
+  - [ ] Log aggregation (ELK stack)
+  - [ ] Alerting rules for SLO violations
+  - [ ] Error budget tracking dashboard
+
+### Phase 6: Stream Processing (Q4 2026)
+- [ ] DDIA Chapter 5: Stream Processing
+  - [ ] Kafka Streams integration
+  - [ ] Event sourcing
+  - [ ] CQRS pattern
+  - [ ] Windowing and aggregations
+  - [ ] Exactly-once semantics
 
 ## 🧪 Testing Strategy
 
